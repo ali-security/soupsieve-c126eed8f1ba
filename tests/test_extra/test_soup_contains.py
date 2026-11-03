@@ -307,3 +307,34 @@ class TestSoupContains(util.TestCase):
             # Verify some things
             self.assertTrue(len(w) == 1)
             self.assertTrue(issubclass(w[-1].category, FutureWarning))
+
+    def test_contains_unclosed_quote(self):
+        """Test contains with unclosed quote fails for syntax error, not timeout error."""
+
+        import platform
+
+        if platform.system() == 'Windows':
+            # `SIGALRM` is not available on Windows.
+            with self.assertRaises(sv.SelectorSyntaxError):
+                sv.compile('span:-soup-contains("' + ('x' * 300))
+            return
+
+        import signal
+
+        def timeout_handler(signum, frame):
+            raise TimeoutError
+
+        original_handler = signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(3)
+
+        passed = False
+        try:
+            with self.assertRaises(sv.SelectorSyntaxError):
+                sv.compile('span:-soup-contains("' + ('x' * 300))
+            passed = True
+        except TimeoutError:
+            pass
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, original_handler)
+        self.assertTrue(passed)
